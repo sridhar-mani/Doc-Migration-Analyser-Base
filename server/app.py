@@ -2,11 +2,14 @@ from server.parser import parse
 from http.client import HTTP_PORT
 import shutil
 from sqlalchemy import true
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from server.schema import FinalReport
 from server.config import TestEnv
 from server.ai_evaluator import evaluate_ai
+from db import ses, get_db
+from model import MigrateRecord
 import os
 import shutil
 
@@ -40,3 +43,11 @@ async def analyze_doc(file: UploadFile = File(...)):
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+
+@app.get("/api/history")
+async def history(db: Session = Depends(get_db)):
+    try:
+        records = db.query(MigrateRecord).order_by(MigrateRecord.created_at.desc()).all()
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

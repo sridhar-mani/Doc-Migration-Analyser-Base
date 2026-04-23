@@ -2,6 +2,17 @@ from docx import Document
 import re
 import fitz
 
+
+def estimate_migration_effort_score(word_count: int, paragraph_count: int, heading_count: int, total_pages: int) -> float:
+    length_component = min(4.0, total_pages / 25.0 * 4.0)
+    density = word_count / max(paragraph_count, 1)
+    density_component = min(2.0, density / 120.0 * 2.0)
+    structure_ratio = heading_count / max(total_pages, 1)
+    structure_component = max(0.0, 2.0 - min(2.0, structure_ratio))
+    size_component = min(2.0, word_count / 8000.0 * 2.0)
+    score = length_component + density_component + structure_component + size_component
+    return round(min(10.0, score), 2)
+
 def calculate_base_metrics( text_blocks: list[str]):
         full_text = "\n".join(text_blocks)
         words = re.findall(r"\b\w+\b", full_text)
@@ -49,6 +60,12 @@ def parse( file_path:str, type: str):
         metrics = calculate_base_metrics(text_blocks)
         metrics["heading_count"] = heading_count
         metrics["total_pages"] = len(doc)
+        metrics["migration_effort_score"] = estimate_migration_effort_score(
+            metrics["word_count"],
+            metrics["paragraph_count"],
+            metrics["heading_count"],
+            metrics["total_pages"],
+        )
         return metrics
     elif type == "docx":
         doc = Document(file_path)
@@ -64,4 +81,10 @@ def parse( file_path:str, type: str):
         estimated_pages = max(1, metrics["word_count"] // 300)
         metrics["heading_count"] = heading_count
         metrics["total_pages"] = estimated_pages
+        metrics["migration_effort_score"] = estimate_migration_effort_score(
+            metrics["word_count"],
+            metrics["paragraph_count"],
+            metrics["heading_count"],
+            metrics["total_pages"],
+        )
         return metrics

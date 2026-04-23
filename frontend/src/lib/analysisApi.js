@@ -34,12 +34,13 @@ export function normalizeReport(report) {
     paragraphs: Number(metrics.paragraph_count || 0),
     headings: Number(metrics.heading_count || 0),
     avgWordsPerParagraph: Number(metrics.avg_words_per_paragraph || 0),
+    effortScore: Number(metrics.migration_effort_score || 0),
     readability: ai.readability_level || "-",
     readabilityScore: mapReadabilityToScore(ai.readability_level),
     contentClarity: ai.content_clarity || "-",
     structuralQuality: ai.structural_quality || "-",
     migrationReadiness: ai.migration_readiness || "-",
-    suggestion: ai.improvement_suggestions?.[0] || "",
+    suggestions: ai.improvement_suggestions || [],
     readiness: readiness.label,
     readinessScore: readiness.score,
   };
@@ -67,4 +68,44 @@ export async function analyzeDocument(file) {
   }
 
   throw lastError || new Error("Unable to analyze document");
+}
+
+export async function fetchHistory() {
+  try {
+    const response = await fetch(`${API_BASE}/api/history`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const records = await response.json();
+    return records.map(normalizeHistoryRecord);
+  } catch (error) {
+    throw error || new Error("Unable to fetch history");
+  }
+}
+
+function normalizeHistoryRecord(record) {
+  const readiness = mapReadinessToViewModel({
+    migration_readiness: record.migration_readiness,
+  });
+
+  return {
+    id: record.id,
+    name: record.filename || "Unknown",
+    fileType: record.filename?.endsWith(".docx") ? "DOCX" : "PDF",
+    pages: Number(record.total_pages || 0),
+    words: Number(record.word_count || 0),
+    paragraphs: Number(record.paragraph_count || 0),
+    headings: Number(record.heading_count || 0),
+    avgWordsPerParagraph: Number(record.avg_words_per_paragraph || 0),
+    effortScore: Number(record.migration_effort_score || 0),
+    readability: record.readability_level || "-",
+    readabilityScore: mapReadabilityToScore(record.readability_level),
+    contentClarity: record.content_clarity || "-",
+    structuralQuality: record.structural_quality || "-",
+    migrationReadiness: record.migration_readiness || "-",
+    suggestions: record.improvement_suggestions
+      ? record.improvement_suggestions.split("\n").filter(Boolean)
+      : [],
+    readiness: readiness.label,
+    readinessScore: readiness.score,
+    createdAt: new Date(record.created_at),
+  };
 }

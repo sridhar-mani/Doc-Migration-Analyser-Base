@@ -9,6 +9,7 @@ export function RawDocumentPanel({ document }) {
     ["Paragraphs", document.paragraphs],
     ["Headings", document.headings],
     ["Avg words/paragraph", document.avgWordsPerParagraph],
+    ["Migration Effort Score", `${document.effortScore}/10`],
   ];
 
   return (

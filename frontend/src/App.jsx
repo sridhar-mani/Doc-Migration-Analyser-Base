@@ -1,11 +1,14 @@
 import { AlertCircle } from "lucide-react";
+import { useEffect } from "react";
 import { AnalysisPanelSimple } from "./components/AnalysisPanelSimple";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DocumentTableSimple } from "./components/DocumentTableSimple";
+import { HistoryPanel } from "./components/HistoryPanel";
 import { RawDocumentPanel } from "./components/RawDocumentPanel";
 import { SummaryCards } from "./components/SummaryCards";
 import { UploadSection } from "./components/UploadSection";
 import { useDocumentAnalysis } from "./hooks/useDocumentAnalysis";
+import { useHistory } from "./hooks/useHistory";
 
 function ErrorBanner({ message }) {
   if (!message) return null;
@@ -20,7 +23,14 @@ function ErrorBanner({ message }) {
 
 export default function App() {
   const { documents, summary, isSubmitting, error, submitFile } = useDocumentAnalysis();
+  const { records: historyRecords, isLoading: historyLoading, error: historyError, refresh: refreshHistory } = useHistory();
   const latestDocument = documents[0];
+
+  useEffect(() => {
+    if (documents.length > 0 && refreshHistory) {
+      refreshHistory();
+    }
+  }, [documents.length, refreshHistory]);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-3 p-3">
@@ -37,6 +47,11 @@ export default function App() {
           <AnalysisPanelSimple document={latestDocument} />
         </section>
       ) : null}
+
+      <section className="border-t border-slate-200 pt-3">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">Analysis History</h2>
+        <HistoryPanel records={historyRecords} isLoading={historyLoading} error={historyError} />
+      </section>
     </main>
   );
 }
