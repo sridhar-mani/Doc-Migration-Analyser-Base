@@ -1,5 +1,5 @@
 ﻿from pydantic import BaseModel, Field
-from typing import List, Literal
+from typing import List, Optional
 
 class DocumentMetrics(BaseModel):
     total_pages: int
@@ -18,5 +18,6 @@ class AIAnalysis(BaseModel):
 
 class FinalReport(BaseModel):
     filename: str
+    file_path: Optional[str] = None
     metrics: DocumentMetrics
     ai_analysis: AIAnalysis 

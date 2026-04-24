@@ -1,21 +1,22 @@
-from server.parser import parse
-from http.client import HTTP_PORT
-import shutil
-from typing import Annotated
-from sqlalchemy import true
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from server.schema import FinalReport, DocumentMetrics
-from server.config import TestEnv
-from server.ai_evaluator import evaluate_ai
-from server.db import ses, get_db, base, eng
-from server.model import MigrateRecord
-import os
-import shutil
-import aiofiles
 import json
+import os
 from pathlib import Path
+from typing import Annotated, Optional
+from uuid import uuid4
+
+import aiofiles
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
+
+from server.ai_evaluator import evaluate_ai
+from server.config import TestEnv
+from server.db import base, eng, get_db
+from server.model import MigrateRecord
+from server.parser import parse
+from server.schema import DocumentMetrics, FinalReport
+
 
 app = FastAPI(title="Migration Auditing")
 
@@ -29,12 +30,68 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials= True,
-    allow_methods = ["*"],
-    allow_headers = ["*"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-os.makedirs(TestEnv.temp_dir,exist_ok=True)
+os.makedirs(TestEnv.temp_dir, exist_ok=True)
+
+
+def ensure_file_path_column() -> None:
+    inspector = inspect(eng)
+    if "migrations" not in inspector.get_table_names():
+        base.metadata.create_all(bind=eng)
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("migrations")}
+    if "file_path" in column_names:
+        return
+
+    try:
+        with eng.begin() as conn:
+            conn.execute(text("ALTER TABLE migrations ADD COLUMN file_path VARCHAR"))
+    except Exception:
+        base.metadata.create_all(bind=eng)
+
+
+ensure_file_path_column()
+
+
+def sanitize_filename(filename: str) -> str:
+    return Path(filename).name
+
+
+def build_storage_path(filename: str) -> Path:
+    return Path(TestEnv.temp_dir) / f"{uuid4().hex}_{sanitize_filename(filename)}"
+
+
+def remove_file_if_exists(file_path: Optional[str]) -> None:
+    if not file_path:
+        return
+
+    path = Path(file_path)
+    if path.exists():
+        path.unlink()
+
+
+def get_extension(filename: str) -> str:
+    return Path(filename).suffix.lstrip(".").lower()
+
+
+def apply_analysis_update(record: MigrateRecord, metrics: DocumentMetrics, ai_analysis) -> None:
+    record.total_pages = metrics.total_pages
+    record.word_count = metrics.word_count
+    record.paragraph_count = metrics.paragraph_count
+    record.heading_count = metrics.heading_count
+    record.avg_words_per_paragraph = metrics.avg_words_per_paragraph
+    record.migration_effort_score = ai_analysis.migration_effort_score
+    record.readability_level = ai_analysis.readability_level
+    record.content_clarity = ai_analysis.content_clarity
+    record.structural_quality = ai_analysis.structural_quality
+    record.migration_readiness = ai_analysis.migration_readiness
+    record.improvement_suggestions = json.dumps(ai_analysis.improvement_suggestions)
+
 
 @app.post(
     "/api/analyze",
@@ -47,46 +104,45 @@ os.makedirs(TestEnv.temp_dir,exist_ok=True)
 async def analyze_doc(
     db: Annotated[Session, Depends(get_db)],
     file: Annotated[UploadFile, File(...)],
-    
 ):
-    if not file.filename.endswith((".pdf",".docx")):
+    original_name = file.filename or "uploaded_document"
+    if not original_name.endswith((".pdf", ".docx")):
         raise HTTPException(status_code=400, detail="Upload only pdf or word.")
-    file_path = os.path.join(TestEnv.temp_dir, file.filename)
-    async with aiofiles.open(file_path, 'wb') as buffer:
+
+    file_path = build_storage_path(original_name)
+    persisted = False
+
+    async with aiofiles.open(file_path, "wb") as buffer:
         while chunk := await file.read(1024 * 1024):
             await buffer.write(chunk)
-    
+
     try:
-        raw_metrics = parse(file_path, file.filename.split(".")[-1].lower())
+        raw_metrics = parse(str(file_path), get_extension(original_name))
         raw_text = raw_metrics.pop("raw_text")
         metrics = DocumentMetrics(**raw_metrics)
         ai_analysis = await evaluate_ai(raw_text, metrics)
 
-        rec = MigrateRecord(
-            filename = file.filename,
-            total_pages=metrics.total_pages,
-            word_count=metrics.word_count,
-            paragraph_count=metrics.paragraph_count,
-            heading_count=metrics.heading_count,
-            avg_words_per_paragraph=metrics.avg_words_per_paragraph,
-            migration_effort_score=ai_analysis.migration_effort_score,
-            readability_level=ai_analysis.readability_level,
-            content_clarity=ai_analysis.content_clarity,
-            structural_quality=ai_analysis.structural_quality,
-            migration_readiness=ai_analysis.migration_readiness,
-            improvement_suggestions=json.dumps(ai_analysis.improvement_suggestions)
-        )
+        rec = MigrateRecord(filename=original_name, file_path=str(file_path))
+        apply_analysis_update(rec, metrics, ai_analysis)
         db.add(rec)
         db.commit()
+        db.refresh(rec)
+        persisted = True
 
-        return FinalReport(filename=file.filename, metrics=metrics, ai_analysis=ai_analysis)
+        return FinalReport(
+            filename=rec.filename,
+            file_path=rec.file_path,
+            metrics=metrics,
+            ai_analysis=ai_analysis,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code = 500, detail = str(e))
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        if not persisted:
+            remove_file_if_exists(str(file_path))
+
 
 @app.get(
     "/api/history",
@@ -98,3 +154,56 @@ async def history(db: Annotated[Session, Depends(get_db)]):
         return records
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post(
+    "/api/recheck/{record_id}",
+    responses={404: {"description": "Record not found."}, 500: {"description": "Internal server error."}},
+)
+async def recheck_history(record_id: int, db: Annotated[Session, Depends(get_db)]):
+    try:
+        rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
+        if not rec:
+            raise HTTPException(status_code=404, detail="Record not found.")
+
+        if not rec.file_path:
+            raise HTTPException(status_code=400, detail="No file path stored for this record.")
+
+        file_path = Path(rec.file_path)
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Source file no longer exists.")
+
+        raw_metrics = parse(str(file_path), get_extension(rec.filename or file_path.name))
+        raw_text = raw_metrics.pop("raw_text")
+        metrics = DocumentMetrics(**raw_metrics)
+        ai_analysis = await evaluate_ai(raw_text, metrics)
+        apply_analysis_update(rec, metrics, ai_analysis)
+        db.commit()
+        db.refresh(rec)
+
+        return {"success": True, "record": rec}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete(
+    "/api/history/{record_id}",
+    responses={404: {"description": "Record not found."}, 500: {"description": "Internal server error."}},
+)
+async def delete_history(record_id: int, db: Annotated[Session, Depends(get_db)]):
+    try:
+        rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
+        if not rec:
+            raise HTTPException(status_code=404, detail="Record not found.")
+
+        remove_file_if_exists(rec.file_path)
+        db.delete(rec)
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        

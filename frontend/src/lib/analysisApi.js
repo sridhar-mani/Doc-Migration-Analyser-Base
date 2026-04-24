@@ -28,6 +28,7 @@ export function normalizeReport(report) {
 
   return {
     name,
+    filePath: report?.file_path || "",
     fileType: ext === "DOCX" ? "DOCX" : "PDF",
     pages: Number(metrics.total_pages || 0),
     words: Number(metrics.word_count || 0),
@@ -81,6 +82,30 @@ export async function fetchHistory() {
   }
 }
 
+export async function recheckRecord(id) {
+  try{
+    const res = await fetch(`${API_BASE}/api/recheck/${id}`, {
+      method: "POST",
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }catch(err){
+    throw err || new Error("Unable to recheck history")
+  }
+}
+
+export async function deleteRecord(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/history/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    throw err || new Error("Unable to delete history record");
+  }
+}
+
 function normalizeHistoryRecord(record) {
   const readiness = mapReadinessToViewModel({
     migration_readiness: record.migration_readiness,
@@ -90,6 +115,7 @@ function normalizeHistoryRecord(record) {
   return {
     id: record.id,
     name: record.filename || "Unknown",
+    filePath: record.file_path || "",
     fileType: record.filename?.endsWith(".docx") ? "DOCX" : "PDF",
     pages: Number(record.total_pages || 0),
     words: Number(record.word_count || 0),

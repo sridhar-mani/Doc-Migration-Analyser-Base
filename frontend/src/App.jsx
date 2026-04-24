@@ -1,5 +1,5 @@
 import { AlertCircle } from "lucide-react";
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useCallback, useState } from "react";
 import { AnalysisPanelSimple } from "./components/AnalysisPanelSimple";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DocumentTableSimple } from "./components/DocumentTableSimple";
@@ -9,6 +9,7 @@ import { SummaryCards } from "./components/SummaryCards";
 import { UploadSection } from "./components/UploadSection";
 import { useDocumentAnalysis } from "./hooks/useDocumentAnalysis";
 import { useHistory } from "./hooks/useHistory";
+import { deleteRecord, recheckRecord } from "./lib/analysisApi";
 
 function ErrorBanner({ message }) {
   if (!message) return null;
@@ -24,6 +25,7 @@ function ErrorBanner({ message }) {
 export default function App() {
   const { documents, isSubmitting, error, submitFile } = useDocumentAnalysis();
   const { records: historyRecords, isLoading: historyLoading, error: historyError, refresh: refreshHistory } = useHistory();
+  const [historyActionError, setHistoryActionError] = useState("");
   const latestDocument = documents[0];
 
   const summary = useMemo(() => {
@@ -44,6 +46,32 @@ export default function App() {
     }
   }, [documents.length, refreshHistory]);
 
+  const handleRecheck = useCallback(
+    async (recordId) => {
+      setHistoryActionError("");
+      try {
+        await recheckRecord(recordId);
+        await refreshHistory();
+      } catch (err) {
+        setHistoryActionError(err?.message || "Failed to recheck record");
+      }
+    },
+    [refreshHistory],
+  );
+
+  const handleDelete = useCallback(
+    async (recordId) => {
+      setHistoryActionError("");
+      try {
+        await deleteRecord(recordId);
+        await refreshHistory();
+      } catch (err) {
+        setHistoryActionError(err?.message || "Failed to delete record");
+      }
+    },
+    [refreshHistory],
+  );
+
   return (
     <main className="relative min-h-screen overflow-hidden px-4 py-5 sm:px-6 sm:py-7 lg:px-10">
       <div className="pointer-events-none absolute inset-0">
@@ -59,6 +87,7 @@ export default function App() {
           <section className="space-y-6 xl:col-span-2">
             <SummaryCards summary={summary} />
             <ErrorBanner message={error} />
+            <ErrorBanner message={historyActionError} />
             <DocumentTableSimple documents={documents} />
 
             {latestDocument ? (
@@ -76,7 +105,13 @@ export default function App() {
 
         <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur sm:p-5">
           <h2 className="mb-3 text-xl font-semibold text-slate-900">Analysis History</h2>
-          <HistoryPanel records={historyRecords} isLoading={historyLoading} error={historyError} />
+          <HistoryPanel
+            records={historyRecords}
+            isLoading={historyLoading}
+            error={historyError}
+            onRecheck={handleRecheck}
+            onDelete={handleDelete}
+          />
         </section>
       </div>
     </main>

@@ -31,7 +31,10 @@ export function DocumentTableSimple({ documents }) {
           <tbody>
             {documents.map((doc) => (
               <tr key={`${doc.name}-${doc.words}`} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-medium text-slate-900">{doc.name}</td>
+                <td className="px-3 py-2 font-medium text-slate-900">
+                  <div className="max-w-xs truncate">{doc.name}</div>
+                  <div className="max-w-xs truncate text-xs text-slate-500">{doc.filePath || ""}</div>
+                </td>
                 <td className="px-3 py-2 text-slate-700">{doc.fileType}</td>
                 <td className="px-3 py-2 text-slate-700">{doc.pages}</td>
                 <td className="px-3 py-2 text-slate-700">{doc.words.toLocaleString()}</td>
