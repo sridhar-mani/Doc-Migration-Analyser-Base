@@ -1,5 +1,5 @@
 import { AlertCircle } from "lucide-react";
-import { useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { AnalysisPanelSimple } from "./components/AnalysisPanelSimple";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DocumentTableSimple } from "./components/DocumentTableSimple";
@@ -22,9 +22,21 @@ function ErrorBanner({ message }) {
 }
 
 export default function App() {
-  const { documents, summary, isSubmitting, error, submitFile } = useDocumentAnalysis();
+  const { documents, isSubmitting, error, submitFile } = useDocumentAnalysis();
   const { records: historyRecords, isLoading: historyLoading, error: historyError, refresh: refreshHistory } = useHistory();
   const latestDocument = documents[0];
+
+  const summary = useMemo(() => {
+    const source = historyRecords.length > 0 ? historyRecords : documents;
+    const total = source.length;
+    const ready = source.filter((d) => d.readiness === "Ready").length;
+    const review = source.filter((d) => d.readiness === "Needs Review").length;
+    const notReady = source.filter((d) => d.readiness === "Not Ready").length;
+    const avgScore = total
+      ? Math.round(source.reduce((sum, d) => sum + d.readinessScore, 0) / total)
+      : 0;
+    return { total, ready, review, notReady, avgScore };
+  }, [historyRecords, documents]);
 
   useEffect(() => {
     if (documents.length > 0 && refreshHistory) {
