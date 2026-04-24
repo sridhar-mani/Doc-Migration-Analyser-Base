@@ -60,7 +60,7 @@ async def analyze_doc(
         raw_metrics = parse(file_path, file.filename.split(".")[-1].lower())
         raw_text = raw_metrics.pop("raw_text")
         metrics = DocumentMetrics(**raw_metrics)
-        ai_analysis = evaluate_ai(raw_text, metrics)
+        ai_analysis = await evaluate_ai(raw_text, metrics)
 
         rec = MigrateRecord(
             filename = file.filename,
