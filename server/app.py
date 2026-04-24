@@ -7,7 +7,6 @@ from uuid import uuid4
 import aiofiles
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from server.ai_evaluator import evaluate_ai
@@ -36,26 +35,6 @@ app.add_middleware(
 )
 
 os.makedirs(TestEnv.temp_dir, exist_ok=True)
-
-
-def ensure_file_path_column() -> None:
-    inspector = inspect(eng)
-    if "migrations" not in inspector.get_table_names():
-        base.metadata.create_all(bind=eng)
-        return
-
-    column_names = {column["name"] for column in inspector.get_columns("migrations")}
-    if "file_path" in column_names:
-        return
-
-    try:
-        with eng.begin() as conn:
-            conn.execute(text("ALTER TABLE migrations ADD COLUMN file_path VARCHAR"))
-    except Exception:
-        base.metadata.create_all(bind=eng)
-
-
-ensure_file_path_column()
 
 
 def sanitize_filename(filename: str) -> str:
@@ -137,8 +116,6 @@ async def analyze_doc(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if not persisted:
             remove_file_if_exists(str(file_path))
@@ -149,11 +126,8 @@ async def analyze_doc(
     responses={500: {"description": "Internal server error."}},
 )
 async def history(db: Annotated[Session, Depends(get_db)]):
-    try:
-        records = db.query(MigrateRecord).order_by(MigrateRecord.created_at.desc()).all()
-        return records
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    records = db.query(MigrateRecord).order_by(MigrateRecord.created_at.desc()).all()
+    return records
 
 
 @app.post(
@@ -161,31 +135,26 @@ async def history(db: Annotated[Session, Depends(get_db)]):
     responses={404: {"description": "Record not found."}, 500: {"description": "Internal server error."}},
 )
 async def recheck_history(record_id: int, db: Annotated[Session, Depends(get_db)]):
-    try:
-        rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
-        if not rec:
-            raise HTTPException(status_code=404, detail="Record not found.")
+    rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found.")
 
-        if not rec.file_path:
-            raise HTTPException(status_code=400, detail="No file path stored for this record.")
+    if not rec.file_path:
+        raise HTTPException(status_code=400, detail="No file path stored for this record.")
 
-        file_path = Path(rec.file_path)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="Source file no longer exists.")
+    file_path = Path(rec.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Source file no longer exists.")
 
-        raw_metrics = parse(str(file_path), get_extension(rec.filename or file_path.name))
-        raw_text = raw_metrics.pop("raw_text")
-        metrics = DocumentMetrics(**raw_metrics)
-        ai_analysis = await evaluate_ai(raw_text, metrics)
-        apply_analysis_update(rec, metrics, ai_analysis)
-        db.commit()
-        db.refresh(rec)
+    raw_metrics = parse(str(file_path), get_extension(rec.filename or file_path.name))
+    raw_text = raw_metrics.pop("raw_text")
+    metrics = DocumentMetrics(**raw_metrics)
+    ai_analysis = await evaluate_ai(raw_text, metrics)
+    apply_analysis_update(rec, metrics, ai_analysis)
+    db.commit()
+    db.refresh(rec)
 
-        return {"success": True, "record": rec}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"success": True, "record": rec}
 
 
 @app.delete(
@@ -193,17 +162,12 @@ async def recheck_history(record_id: int, db: Annotated[Session, Depends(get_db)
     responses={404: {"description": "Record not found."}, 500: {"description": "Internal server error."}},
 )
 async def delete_history(record_id: int, db: Annotated[Session, Depends(get_db)]):
-    try:
-        rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
-        if not rec:
-            raise HTTPException(status_code=404, detail="Record not found.")
+    rec = db.query(MigrateRecord).filter(MigrateRecord.id == record_id).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found.")
 
-        remove_file_if_exists(rec.file_path)
-        db.delete(rec)
-        db.commit()
-        return {"success": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    remove_file_if_exists(rec.file_path)
+    db.delete(rec)
+    db.commit()
+    return {"success": True}
         

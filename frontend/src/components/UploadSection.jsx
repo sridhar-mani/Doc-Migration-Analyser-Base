@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export function UploadSection({ isSubmitting, onSubmit }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -36,7 +37,10 @@ export function UploadSection({ isSubmitting, onSubmit }) {
             disabled={!selectedFile || isSubmitting}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 sm:ml-auto"
           >
-            {isSubmitting ? "Analyzing..." : "Analyze"}
+            <span className="inline-flex items-center gap-2">
+              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+              {isSubmitting ? "Analyzing..." : "Analyze"}
+            </span>
           </button>
         </div>
       </div>

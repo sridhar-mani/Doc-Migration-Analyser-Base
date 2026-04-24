@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 function statusClasses(status) {
@@ -18,27 +19,23 @@ function formatDate(date) {
   });
 }
 
-export function HistoryPanel({ records, isLoading, error, onRecheck, onDelete }) {
-  const [busyId, setBusyId] = useState(null);
-
+export function HistoryPanel({ records, isLoading, error, onRecheck, onDelete, busyAction }) {
   async function handleRecheck(record) {
     if (!onRecheck) return;
-    setBusyId(record.id);
-    try {
-      await onRecheck(record.id);
-    } finally {
-      setBusyId(null);
-    }
+    const confirmed = window.confirm(
+      `Recheck ${record.name}? This will run the AI analysis again on the stored file.`,
+    );
+    if (!confirmed) return;
+    await onRecheck(record.id);
   }
 
   async function handleDelete(record) {
     if (!onDelete) return;
-    setBusyId(record.id);
-    try {
-      await onDelete(record.id);
-    } finally {
-      setBusyId(null);
-    }
+    const confirmed = window.confirm(
+      `Delete ${record.name}? This will remove the record and its stored file.`,
+    );
+    if (!confirmed) return;
+    await onDelete(record.id);
   }
 
   if (error) {
@@ -63,6 +60,14 @@ export function HistoryPanel({ records, isLoading, error, onRecheck, onDelete })
         No analysis history yet. Upload a document to get started.
       </div>
     );
+  }
+
+  function getFilePathLabel(filePath) {
+    return filePath || "Unavailable";
+  }
+
+  function isRowBusy(recordId, action) {
+    return busyAction?.id === recordId && busyAction?.type === action;
   }
 
   return (
@@ -92,7 +97,7 @@ export function HistoryPanel({ records, isLoading, error, onRecheck, onDelete })
                 </td>
                 <td className="px-3 py-2 text-xs text-slate-500">
                   <div className="max-w-sm truncate" title={record.filePath || ""}>
-                    {record.filePath || "-"}
+                    {getFilePathLabel(record.filePath)}
                   </div>
                 </td>
                 <td className="px-3 py-2 text-slate-700">{record.fileType}</td>
@@ -110,18 +115,24 @@ export function HistoryPanel({ records, isLoading, error, onRecheck, onDelete })
                     <button
                       type="button"
                       onClick={() => handleRecheck(record)}
-                      disabled={busyId === record.id}
+                      disabled={isRowBusy(record.id, "recheck") || !record.filePath}
                       className="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Recheck
+                      <span className="inline-flex items-center gap-1.5">
+                        {isRowBusy(record.id, "recheck") ? <Loader2 size={12} className="animate-spin" /> : null}
+                        {isRowBusy(record.id, "recheck") ? "Rechecking..." : "Recheck"}
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(record)}
-                      disabled={busyId === record.id}
+                      disabled={isRowBusy(record.id, "delete")}
                       className="rounded-md border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Delete
+                      <span className="inline-flex items-center gap-1.5">
+                        {isRowBusy(record.id, "delete") ? <Loader2 size={12} className="animate-spin" /> : null}
+                        {isRowBusy(record.id, "delete") ? "Deleting..." : "Delete"}
+                      </span>
                     </button>
                   </div>
                 </td>

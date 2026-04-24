@@ -1,11 +1,13 @@
-from server.db import base
-from sqlalchemy import  Column, Integer, String, Float, Text, DateTime
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+
+from server.db import base
+
 
 class MigrateRecord(base):
     __tablename__ = "migrations"
 
-    
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
     file_path = Column(String)
@@ -22,5 +24,5 @@ class MigrateRecord(base):
     content_clarity = Column(Text)
     structural_quality = Column(String)
     migration_readiness = Column(String)
-    
+
     improvement_suggestions = Column(Text)

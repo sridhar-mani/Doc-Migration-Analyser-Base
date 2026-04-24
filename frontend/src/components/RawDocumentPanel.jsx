@@ -3,7 +3,7 @@ export function RawDocumentPanel({ document }) {
 
   const rows = [
     ["Filename", document.name],
-    ["File path", document.filePath || "-"],
+    ["File path", document.filePath || "Unavailable"],
     ["Type", document.fileType],
     ["Pages", document.pages],
     ["Words", document.words.toLocaleString()],

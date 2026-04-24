@@ -62,6 +62,7 @@ def extract_pdf_text_blocks(doc, base_size: int):
 
     return text_blocks, heading_count
 
+
 def parse_pdf(file_path: str):
     doc = fitz.open(file_path)
     font_sizes = collect_pdf_font_sizes(doc)
@@ -110,9 +111,9 @@ def parse_docx(file_path: str):
     return metrics
 
 
-def parse(file_path: str, type: str):
-    if type == "pdf":
+def parse(file_path: str, file_type: str):
+    if file_type == "pdf":
         return parse_pdf(file_path)
-    if type == "docx":
+    if file_type == "docx":
         return parse_docx(file_path)
-    raise ValueError(f"Unsupported file type: {type}")
+    raise ValueError(f"Unsupported file type: {file_type}")

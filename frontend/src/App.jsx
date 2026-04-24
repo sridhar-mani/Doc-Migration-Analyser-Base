@@ -26,10 +26,12 @@ export default function App() {
   const { documents, isSubmitting, error, submitFile } = useDocumentAnalysis();
   const { records: historyRecords, isLoading: historyLoading, error: historyError, refresh: refreshHistory } = useHistory();
   const [historyActionError, setHistoryActionError] = useState("");
-  const latestDocument = documents[0];
+  const [historyBusyAction, setHistoryBusyAction] = useState(null);
+  const visibleDocuments = isSubmitting ? [] : documents;
+  const latestDocument = visibleDocuments[0];
 
   const summary = useMemo(() => {
-    const source = historyRecords.length > 0 ? historyRecords : documents;
+    const source = historyRecords.length > 0 ? historyRecords : visibleDocuments;
     const total = source.length;
     const ready = source.filter((d) => d.readiness === "Ready").length;
     const review = source.filter((d) => d.readiness === "Needs Review").length;
@@ -38,7 +40,7 @@ export default function App() {
       ? Math.round(source.reduce((sum, d) => sum + d.readinessScore, 0) / total)
       : 0;
     return { total, ready, review, notReady, avgScore };
-  }, [historyRecords, documents]);
+  }, [historyRecords, visibleDocuments]);
 
   useEffect(() => {
     if (documents.length > 0 && refreshHistory) {
@@ -49,11 +51,14 @@ export default function App() {
   const handleRecheck = useCallback(
     async (recordId) => {
       setHistoryActionError("");
+      setHistoryBusyAction({ type: "recheck", id: recordId });
       try {
         await recheckRecord(recordId);
         await refreshHistory();
       } catch (err) {
         setHistoryActionError(err?.message || "Failed to recheck record");
+      } finally {
+        setHistoryBusyAction(null);
       }
     },
     [refreshHistory],
@@ -62,11 +67,14 @@ export default function App() {
   const handleDelete = useCallback(
     async (recordId) => {
       setHistoryActionError("");
+      setHistoryBusyAction({ type: "delete", id: recordId });
       try {
         await deleteRecord(recordId);
         await refreshHistory();
       } catch (err) {
         setHistoryActionError(err?.message || "Failed to delete record");
+      } finally {
+        setHistoryBusyAction(null);
       }
     },
     [refreshHistory],
@@ -88,7 +96,7 @@ export default function App() {
             <SummaryCards summary={summary} />
             <ErrorBanner message={error} />
             <ErrorBanner message={historyActionError} />
-            <DocumentTableSimple documents={documents} />
+            <DocumentTableSimple documents={visibleDocuments} />
 
             {latestDocument ? (
               <section className="grid gap-6 lg:grid-cols-2">
@@ -111,6 +119,7 @@ export default function App() {
             error={historyError}
             onRecheck={handleRecheck}
             onDelete={handleDelete}
+            busyAction={historyBusyAction}
           />
         </section>
       </div>

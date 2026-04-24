@@ -43,11 +43,11 @@ async def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
-    llm = ChatOllama(model=TestEnv.ai_model, temperature=0.0, reasoning=True)
+    llm = ChatOllama(model=TestEnv.ai_model, temperature=0.0, reasoning=True, num_gpu=30)
     chain = prompt | llm | RunnableLambda(_strip_thinking) | parser
 
     try:
-        return await chain.invoke({
+        return await chain.ainvoke({
             "total_pages": metrics.total_pages,
             "word_count": metrics.word_count,
             "paragraph_count": metrics.paragraph_count,
@@ -55,7 +55,7 @@ async def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
             "heading_count": metrics.heading_count,
             "content": truncated_txt
         })
-    except Exception as e:
+    except Exception:
         return AIAnalysis(
             readability_level="Unknown",
             content_clarity="Evaluation failed to process context.",

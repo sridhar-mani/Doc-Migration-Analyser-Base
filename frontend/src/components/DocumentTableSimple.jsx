@@ -33,7 +33,7 @@ export function DocumentTableSimple({ documents }) {
               <tr key={`${doc.name}-${doc.words}`} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-medium text-slate-900">
                   <div className="max-w-xs truncate">{doc.name}</div>
-                  <div className="max-w-xs truncate text-xs text-slate-500">{doc.filePath || ""}</div>
+                  <div className="max-w-xs truncate text-xs text-slate-500">{doc.filePath || "Unavailable"}</div>
                 </td>
                 <td className="px-3 py-2 text-slate-700">{doc.fileType}</td>
                 <td className="px-3 py-2 text-slate-700">{doc.pages}</td>
