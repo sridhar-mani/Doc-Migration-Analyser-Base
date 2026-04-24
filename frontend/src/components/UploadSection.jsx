@@ -10,16 +10,16 @@ export function UploadSection({ isSubmitting, onSubmit }) {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur sm:p-5">
+      <div className="flex flex-col gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Upload Document</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Upload Document</h2>
           <p className="text-sm text-slate-600">Supported formats: PDF, DOCX</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-            Choose file
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="cursor-pointer rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <span>Choose file</span>
             <input
               type="file"
               className="hidden"
@@ -27,14 +27,14 @@ export function UploadSection({ isSubmitting, onSubmit }) {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
             />
           </label>
-          <span className="max-w-52 truncate text-sm text-slate-600">
+          <span className="max-w-full truncate text-sm text-slate-600 sm:max-w-52">
             {selectedFile?.name || "No file selected"}
           </span>
           <button
             type="button"
             onClick={handleAnalyze}
             disabled={!selectedFile || isSubmitting}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 sm:ml-auto"
           >
             {isSubmitting ? "Analyzing..." : "Analyze"}
           </button>

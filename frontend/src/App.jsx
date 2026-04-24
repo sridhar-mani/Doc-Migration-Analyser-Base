@@ -33,25 +33,40 @@ export default function App() {
   }, [documents.length, refreshHistory]);
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-3 p-3">
-      <DashboardHeader avgScore={summary.avgScore} />
-      <SummaryCards summary={summary} />
-      <UploadSection isSubmitting={isSubmitting} onSubmit={submitFile} />
-      <ErrorBanner message={error} />
+    <main className="relative min-h-screen overflow-hidden px-4 py-5 sm:px-6 sm:py-7 lg:px-10">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-16 h-64 w-64 rounded-full bg-cyan-200/30 blur-3xl" />
+        <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-indigo-200/30 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-200/25 blur-3xl" />
+      </div>
 
-      <DocumentTableSimple documents={documents} />
+      <div className="relative mx-auto w-full max-w-screen-2xl space-y-6">
+        <DashboardHeader avgScore={summary.avgScore} />
 
-      {latestDocument ? (
-        <section className="grid gap-3 lg:grid-cols-2">
-          <RawDocumentPanel document={latestDocument} />
-          <AnalysisPanelSimple document={latestDocument} />
+        <div className="grid gap-6 xl:grid-cols-3">
+          <section className="space-y-6 xl:col-span-2">
+            <SummaryCards summary={summary} />
+            <ErrorBanner message={error} />
+            <DocumentTableSimple documents={documents} />
+
+            {latestDocument ? (
+              <section className="grid gap-6 lg:grid-cols-2">
+                <RawDocumentPanel document={latestDocument} />
+                <AnalysisPanelSimple document={latestDocument} />
+              </section>
+            ) : null}
+          </section>
+
+          <aside className="space-y-6 xl:sticky xl:top-6 xl:h-fit">
+            <UploadSection isSubmitting={isSubmitting} onSubmit={submitFile} />
+          </aside>
+        </div>
+
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur sm:p-5">
+          <h2 className="mb-3 text-xl font-semibold text-slate-900">Analysis History</h2>
+          <HistoryPanel records={historyRecords} isLoading={historyLoading} error={historyError} />
         </section>
-      ) : null}
-
-      <section className="border-t border-slate-200 pt-3">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Analysis History</h2>
-        <HistoryPanel records={historyRecords} isLoading={historyLoading} error={historyError} />
-      </section>
+      </div>
     </main>
   );
 }

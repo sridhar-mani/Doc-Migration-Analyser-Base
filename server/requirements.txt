@@ -1,0 +1,11 @@
+fastapi[standard]
+sqlalchemy
+pydantic
+python-docx
+pymupdf
+aiofiles
+python-dotenv
+langchain-core
+langchain-community
+ollama
+langchain_ollama

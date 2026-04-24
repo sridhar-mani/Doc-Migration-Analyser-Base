@@ -34,7 +34,7 @@ export function normalizeReport(report) {
     paragraphs: Number(metrics.paragraph_count || 0),
     headings: Number(metrics.heading_count || 0),
     avgWordsPerParagraph: Number(metrics.avg_words_per_paragraph || 0),
-    effortScore: Number(metrics.migration_effort_score || 0),
+    effortScore: Number(ai.migration_effort_score || 0),
     readability: ai.readability_level || "-",
     readabilityScore: mapReadabilityToScore(ai.readability_level),
     contentClarity: ai.content_clarity || "-",
@@ -85,6 +85,7 @@ function normalizeHistoryRecord(record) {
   const readiness = mapReadinessToViewModel({
     migration_readiness: record.migration_readiness,
   });
+  const suggestions = parseSuggestions(record.improvement_suggestions);
 
   return {
     id: record.id,
@@ -101,11 +102,28 @@ function normalizeHistoryRecord(record) {
     contentClarity: record.content_clarity || "-",
     structuralQuality: record.structural_quality || "-",
     migrationReadiness: record.migration_readiness || "-",
-    suggestions: record.improvement_suggestions
-      ? record.improvement_suggestions.split("\n").filter(Boolean)
-      : [],
+    suggestions,
     readiness: readiness.label,
     readinessScore: readiness.score,
     createdAt: new Date(record.created_at),
   };
+}
+
+function parseSuggestions(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch {
+      return value.split("\n").filter(Boolean);
+    }
+
+    return value.split("\n").filter(Boolean);
+  }
+
+  return [];
 }
