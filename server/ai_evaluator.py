@@ -12,7 +12,7 @@ def _strip_thinking(message) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
-def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
+async def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
     parser = PydanticOutputParser(pydantic_object=AIAnalysis)
     truncated_txt = raw_text[:6000]
 
@@ -47,7 +47,7 @@ def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
     chain = prompt | llm | RunnableLambda(_strip_thinking) | parser
 
     try:
-        return chain.invoke({
+        return await chain.invoke({
             "total_pages": metrics.total_pages,
             "word_count": metrics.word_count,
             "paragraph_count": metrics.paragraph_count,
