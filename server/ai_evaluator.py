@@ -14,7 +14,20 @@ def _strip_thinking(message) -> str:
 
 async def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
     parser = PydanticOutputParser(pydantic_object=AIAnalysis)
-    truncated_txt = raw_text[:6000]
+    max_chars = 9000
+    if len(raw_text) <= max_chars:
+        sampled_text = raw_text
+    else:
+        chunk = max_chars // 3
+        mid_start = max(0, (len(raw_text) // 2) - (chunk // 2))
+        mid_end = mid_start + chunk
+        sampled_text = (
+            raw_text[:chunk]
+            + "\n\n...[content omitted for length]...\n\n"
+            + raw_text[mid_start:mid_end]
+            + "\n\n...[content omitted for length]...\n\n"
+            + raw_text[-chunk:]
+        )
 
     prompt = PromptTemplate(
         template="""You are a Lead Migration Architect auditing technical documentation for Document360.
@@ -53,7 +66,7 @@ async def evaluate_ai(raw_text: str, metrics: DocumentMetrics):
             "paragraph_count": metrics.paragraph_count,
             "avg_words": metrics.avg_words_per_paragraph,
             "heading_count": metrics.heading_count,
-            "content": truncated_txt
+            "content": sampled_text
         })
     except Exception:
         return AIAnalysis(

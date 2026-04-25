@@ -85,7 +85,8 @@ async def analyze_doc(
     file: Annotated[UploadFile, File(...)],
 ):
     original_name = file.filename or "uploaded_document"
-    if not original_name.endswith((".pdf", ".docx")):
+    file_ext = get_extension(original_name)
+    if file_ext not in {"pdf", "docx"}:
         raise HTTPException(status_code=400, detail="Upload only pdf or word.")
 
     file_path = build_storage_path(original_name)
@@ -96,7 +97,7 @@ async def analyze_doc(
             await buffer.write(chunk)
 
     try:
-        raw_metrics = parse(str(file_path), get_extension(original_name))
+        raw_metrics = parse(str(file_path), file_ext)
         raw_text = raw_metrics.pop("raw_text")
         metrics = DocumentMetrics(**raw_metrics)
         ai_analysis = await evaluate_ai(raw_text, metrics)

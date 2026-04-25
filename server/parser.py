@@ -35,6 +35,25 @@ def collect_pdf_font_sizes(doc):
     ]
 
 
+HEADING_TEXT_PATTERN = re.compile(
+    r"^((\d+(\.\d+)*[.)]?)\s+)?[A-Z][A-Za-z0-9&/()\-:, ]{2,}$"
+)
+
+
+def text_looks_like_heading(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    words = stripped.split()
+    if len(words) > 16:
+        return False
+
+    is_numbered = bool(re.match(r"^\d+(\.\d+)*[.)]?\s+\S+", stripped))
+    is_title_case = stripped == stripped.title()
+    is_upper = stripped.isupper() and len(words) <= 12
+    return bool(HEADING_TEXT_PATTERN.match(stripped)) or is_numbered or is_title_case or is_upper
+
+
 def block_is_heading(spans, base_size: int) -> bool:
     for span in spans:
         if span["size"] > base_size + 1.5 or "bold" in span["font"].lower():
@@ -57,7 +76,8 @@ def extract_pdf_text_blocks(doc, base_size: int):
                 continue
 
             text_blocks.append(cleaned_text)
-            if block_is_heading(spans, base_size) and len(cleaned_text.split()) < 15:
+            short_block = len(cleaned_text.split()) < 18
+            if short_block and (block_is_heading(spans, base_size) or text_looks_like_heading(cleaned_text)):
                 heading_count += 1
 
     return text_blocks, heading_count
@@ -68,11 +88,19 @@ def parse_pdf(file_path: str):
     font_sizes = collect_pdf_font_sizes(doc)
     base_size = max(set(font_sizes), key=font_sizes.count) if font_sizes else 12
     text_blocks, heading_count = extract_pdf_text_blocks(doc, base_size)
+    has_images = any(
+        page.get_images(full=True)
+        for page in doc
+    )
 
     metrics = calculate_base_metrics(text_blocks)
     metrics["heading_count"] = heading_count
     metrics["total_pages"] = len(doc)
     if metrics["word_count"] == 0:
+        if has_images:
+            raise ValueError(
+                "PDF appears image-based/scanned with no extractable text. Run OCR first, then re-upload."
+            )
         raise ValueError("Document is empty or contains no extractable text.")
     return metrics
 
@@ -100,7 +128,12 @@ def parse_docx(file_path: str):
         cleaned_text = para.text.strip()
         if cleaned_text:
             text_blocks.append(cleaned_text)
-            if para.style.name.startswith("Heading") or para.style.name.startswith("Title"):
+            style_name = (para.style.name or "").lower()
+            if (
+                style_name.startswith("heading")
+                or style_name.startswith("title")
+                or text_looks_like_heading(cleaned_text)
+            ):
                 heading_count += 1
 
     metrics = calculate_base_metrics(text_blocks)
